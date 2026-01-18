@@ -1,5 +1,8 @@
 import express from "express";
 import { pipeline } from "@xenova/transformers";
+import { spawn } from "child_process";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 
@@ -18,7 +21,7 @@ app.get("/", (req, res) => {
   res.status(200).send("Hello!!!!!");
 });
 
-app.get("/predict", async (req, res) => {
+app.get("/frame", async (req, res) => {
   const response = await fetch("http://172.20.10.2/capture");
   const buffer = Buffer.from(await response.arrayBuffer());
 
@@ -31,6 +34,19 @@ app.get("/predict", async (req, res) => {
   fs.writeFileSync(filepath, buffer);
 
   res.json({ file: filename });
+});
+
+app.get("/predict", async (req, res) => {
+  const response = await fetch("http://172.20.10.2/capture");
+  const buffer = Buffer.from(await response.arrayBuffer());
+
+  const py = spawn("python3", ["predict.py"]);
+  py.stdout.on("data", (d) => (output += d.toString()));
+
+  py.on("close", () => res.json(JSON.parse(output)));
+
+  py.stdin.write(buffer);
+  py.stdin.end();
 });
 
 app.listen(port, () => {
