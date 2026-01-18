@@ -36,12 +36,10 @@ export const Account = mongoose.model(
 
     fridgeCode: {
       type: String,
-      required: true,
     },
 
     householdName: {
       type: String,
-      required: true,
     },
 
     preferences: {
