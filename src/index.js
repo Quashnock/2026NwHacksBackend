@@ -62,6 +62,7 @@ app.get("/predict", async (req, res) => {
 
 app.post("/user", async (req, res) => {
   try {
+    console.log(req);
     const { firstName, lastName, dateOfBirth, email, password } =
       req.body || {};
 
@@ -81,7 +82,7 @@ app.post("/user", async (req, res) => {
 
     res.status(201).json({ message: "Account created" });
   } catch (err) {
-    console.error("Error creating account:", err);
+    console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
