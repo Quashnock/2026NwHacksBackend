@@ -34,6 +34,16 @@ export const Account = mongoose.model(
       required: true,
     },
 
+    fridgeCode: {
+      type: String,
+      required: true,
+    },
+
+    householdName: {
+      type: String,
+      required: true,
+    },
+
     preferences: {
       dietaryRestrictions: {
         type: [String],

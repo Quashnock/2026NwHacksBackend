@@ -60,10 +60,25 @@ app.get("/predict", async (req, res) => {
 
 app.post("/user", async (req, res) => {
   try {
-    const { firstName, lastName, dateOfBirth, email, password } =
-      req.body || {};
+    const {
+      firstName,
+      lastName,
+      dateOfBirth,
+      email,
+      password,
+      fridgeCode,
+      householdName,
+    } = req.body || {};
 
-    if (!firstName || !lastName || !dateOfBirth || !email || !password) {
+    if (
+      !firstName ||
+      !lastName ||
+      !dateOfBirth ||
+      !email ||
+      !password ||
+      !fridgeCode ||
+      !householdName
+    ) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -73,6 +88,8 @@ app.post("/user", async (req, res) => {
       dateOfBirth,
       email,
       password,
+      fridgeCode,
+      householdName,
     });
 
     await account.save();
