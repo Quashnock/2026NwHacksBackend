@@ -3,7 +3,7 @@ import { pipeline } from "@xenova/transformers";
 import { spawn } from "child_process";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import { Account } from "./db.js";
+import { Account, FridgeItem } from "./db.js";
 import {
   GoogleGenAI,
   createUserContent,
@@ -87,9 +87,11 @@ app.get("/prompt", async (req, res) => {
   res.send(response.text);
 });
 
-app.get("/fridgeContents", async (req, res) => {
+app.put("/fridge/:email", async (req, res) => {
   const response = await fetch("http://10.19.130.119/capture");
   const buffer = Buffer.from(await response.arrayBuffer());
+
+  const email = req.params.email;
 
   const folder = path.join(process.cwd(), "frames");
   fs.mkdirSync(folder, { recursive: true });
@@ -116,12 +118,34 @@ app.get("/fridgeContents", async (req, res) => {
     ],
   });
 
-  console.log(aiResponse);
+  const items = aiResponse.candidates[0].content.parts[0].text.split(",");
+
+  for (const name of items) {
+    await FridgeItem.updateOne(
+      { name, email },
+      {
+        $setOnInsert: { firstSeenAt: new Date(timestamp) },
+        $set: { lastSeenAt: new Date(timestamp) },
+      },
+      { upsert: true },
+    );
+  }
+
+  await FridgeItem.deleteMany({
+    email,
+    lastSeenAt: { $lt: new Date(timestamp) },
+    name: { $nin: items },
+  });
 
   return res.status(200).json({
     timestamp,
-    text: aiResponse.candidates[0].content.parts[0].text.split(","),
+    items,
   });
+});
+
+app.get("/fridge/:email", async (req, res) => {
+  const items = await FridgeItem.find({ email: req.params.email });
+  res.json(items);
 });
 
 app.post("/user", async (req, res) => {

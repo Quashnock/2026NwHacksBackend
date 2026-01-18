@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { mongo } from "mongoose";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -55,6 +55,29 @@ export const Account = mongoose.model(
         type: [String],
         default: [],
       },
+    },
+  }),
+);
+
+export const FridgeItem = mongoose.model(
+  "FridgeItem",
+  new mongoose.Schema({
+    email: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    name: {
+      type: String,
+      required: true,
+    },
+    firstSeenAt: {
+      type: Date,
+      required: true,
+    },
+    lastSeenAt: {
+      type: Date,
+      required: true,
     },
   }),
 );
