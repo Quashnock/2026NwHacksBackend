@@ -71,6 +71,10 @@ export const FridgeItem = mongoose.model(
       type: String,
       required: true,
     },
+    estimatedShelfLifeDays: {
+      type: String,
+      required: true,
+    },
     firstSeenAt: {
       type: Date,
       required: true,

@@ -112,20 +112,41 @@ app.put("/fridge/:email", async (req, res) => {
     model: "gemini-3-flash-preview",
     contents: [
       createUserContent([
-        "List all of the food items present in the image, seperated only with commas and no spaces",
+        `Identify all food items in the image.
+        Return ONLY the following two lines, no markdown, no backticks:
+
+        ITEMS: item1,item2,itrem3
+        LIFESPANS: days1, days2, days3
+
+        "LIFESPANS" should be the estimated number of days each item lasts in a refrigerator.
+         The order of items must match between the two lines.
+        `,
         createPartFromUri(image.uri, image.mimeType),
       ]),
     ],
   });
 
-  const items = aiResponse.candidates[0].content.parts[0].text.split(",");
+  const text = aiResponse.candidates[0].content.parts[0].text;
 
-  for (const name of items) {
+  const lines = text.split("\n");
+
+  const items = lines[0].replace("ITEMS:", "").trim().split(",");
+  const lifespans = lines[1].replace("LIFESPANS:", "").trim().split(",");
+
+  const parsed = items.map((name, i) => ({
+    name,
+    estimatedShelfLifeDays: Number(lifespans[i]),
+  }));
+
+  for (const item of parsed) {
     await FridgeItem.updateOne(
-      { name, email },
+      { name: item.name, email },
       {
         $setOnInsert: { firstSeenAt: new Date(timestamp) },
-        $set: { lastSeenAt: new Date(timestamp) },
+        $set: {
+          lastSeenAt: new Date(timestamp),
+          estimatedShelfLifeDays: item.estimatedShelfLifeDays,
+        },
       },
       { upsert: true },
     );
@@ -134,13 +155,11 @@ app.put("/fridge/:email", async (req, res) => {
   await FridgeItem.deleteMany({
     email,
     lastSeenAt: { $lt: new Date(timestamp) },
-    name: { $nin: items },
+    name: { $nin: items.map((i) => i.name) },
   });
 
-  return res.status(200).json({
-    timestamp,
-    items,
-  });
+  const resultItems = await FridgeItem.find({ email }).lean();
+  return res.status(200).json(resultItems);
 });
 
 app.get("/fridge/:email", async (req, res) => {
