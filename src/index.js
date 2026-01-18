@@ -78,7 +78,7 @@ app.get("/frame", async (req, res) => {
   res.json({ file: filename });
 });
 
-app.get("/prompt", async (req, res) => {
+app.post("/prompt", async (req, res) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: req.body.prompt,
