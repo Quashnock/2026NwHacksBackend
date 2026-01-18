@@ -4,6 +4,7 @@ import { spawn } from "child_process";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { Account } from "./db.js";
+import cors from "cors";
 import fs from "fs";
 import path from "path";
 
@@ -61,25 +62,10 @@ app.get("/predict", async (req, res) => {
 
 app.post("/user", async (req, res) => {
   try {
-    const {
-      firstName,
-      lastName,
-      dateOfBirth,
-      email,
-      password,
-      fridgeCode,
-      householdName,
-    } = req.body || {};
+    const { firstName, lastName, dateOfBirth, email, password } =
+      req.body || {};
 
-    if (
-      !firstName ||
-      !lastName ||
-      !dateOfBirth ||
-      !email ||
-      !password ||
-      !fridgeCode ||
-      !householdName
-    ) {
+    if (!firstName || !lastName || !dateOfBirth || !email || !password) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -89,8 +75,6 @@ app.post("/user", async (req, res) => {
       dateOfBirth,
       email,
       password,
-      fridgeCode,
-      householdName,
     });
 
     await account.save();
@@ -258,6 +242,34 @@ app.get("/user/:email/recipeInterests", async (req, res) => {
     res.status(200).json(account.preferences.recipeInterests);
   } catch (err) {
     console.error("Error retrieving recipe interests:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.put("/user/:email/fridgeHousehold", async (req, res) => {
+  try {
+    const { email } = req.params;
+    if (!email) {
+      return res.status(400).json({ error: "Missing email" });
+    }
+
+    const { fridgeCode, householdName } = req.body || {};
+    if (!fridgeCode || !householdName) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const updated = await Account.findOneAndUpdate(
+      { email },
+      { fridgeCode: fridgeCode, householdName: householdName },
+      { new: true },
+    );
+    if (!updated) {
+      return res.status(404).json({ error: "Account not found" });
+    }
+
+    res.status(200).json(updated);
+  } catch (err) {
+    console.error("Error updating recipe interests:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
