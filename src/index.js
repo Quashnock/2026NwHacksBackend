@@ -4,12 +4,41 @@ import { spawn } from "child_process";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { Account } from "./db.js";
+import {
+  GoogleGenAI,
+  createUserContent,
+  createPartFromUri,
+} from "@google/genai";
 import cors from "cors";
 import fs from "fs";
+import sharp from "sharp";
 import path from "path";
 
 const app = express();
 const port = 3333;
+
+dotenv.config();
+
+const MAX_FRAMES = 10;
+
+function enforceFrameLimit(folder) {
+  const files = fs
+    .readdirSync(folder)
+    .map((name) => ({
+      name,
+      time: fs.statSync(path.join(folder, name)).mtimeMs,
+    }))
+    .sort((a, b) => a.time - b.time); // oldest → newest
+
+  if (files.length > MAX_FRAMES) {
+    const excess = files.length - MAX_FRAMES;
+    const toDelete = files.slice(0, excess);
+
+    for (const file of toDelete) {
+      fs.unlinkSync(path.join(folder, file.name));
+    }
+  }
+}
 
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
@@ -19,6 +48,8 @@ mongoose.connect(process.env.MONGODB_URI, {
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API });
 
 let classifier;
 async () => {
@@ -47,17 +78,50 @@ app.get("/frame", async (req, res) => {
   res.json({ file: filename });
 });
 
-app.get("/predict", async (req, res) => {
-  const response = await fetch("http://172.20.10.2/capture");
+app.get("/prompt", async (req, res) => {
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: req.body.prompt,
+  });
+
+  res.send(response.text);
+});
+
+app.get("/fridgeContents", async (req, res) => {
+  const response = await fetch("http://10.19.130.119/capture");
   const buffer = Buffer.from(await response.arrayBuffer());
 
-  const py = spawn("python3", ["predict.py"]);
-  py.stdout.on("data", (d) => (output += d.toString()));
+  const folder = path.join(process.cwd(), "frames");
+  fs.mkdirSync(folder, { recursive: true });
 
-  py.on("close", () => res.json(JSON.parse(output)));
+  const timestamp = Date.now();
 
-  py.stdin.write(buffer);
-  py.stdin.end();
+  const filename = `frame_${timestamp}.jpg`;
+  const filepath = path.join(folder, filename);
+
+  fs.writeFileSync(filepath, buffer);
+  enforceFrameLimit(folder);
+
+  const image = await ai.files.upload({
+    file: filepath,
+  });
+
+  const aiResponse = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: [
+      createUserContent([
+        "List all of the food items present in the image, seperated only with commas and no spaces",
+        createPartFromUri(image.uri, image.mimeType),
+      ]),
+    ],
+  });
+
+  console.log(aiResponse);
+
+  return res.status(200).json({
+    timestamp,
+    text: aiResponse.candidates[0].content.parts[0].text.split(","),
+  });
 });
 
 app.post("/user", async (req, res) => {
