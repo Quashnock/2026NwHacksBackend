@@ -3,11 +3,20 @@ import { pipeline } from "@xenova/transformers";
 import { spawn } from "child_process";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import { Account } from "./db.js";
 import fs from "fs";
 import path from "path";
 
 const app = express();
 const port = 3333;
+
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 let classifier;
 async () => {
@@ -47,6 +56,22 @@ app.get("/predict", async (req, res) => {
 
   py.stdin.write(buffer);
   py.stdin.end();
+});
+
+app.post("/write", (req, res) => {
+  console.log(req.body);
+  const { firstName, lastName, dateOfBirth, email, password } = req.body;
+  const account = new Account({
+    firstName,
+    lastName,
+    dateOfBirth,
+    email,
+    password,
+  });
+
+  account.save();
+
+  res.status(200).send("Login received");
 });
 
 app.listen(port, () => {
